@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Tests / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors
+.vscode/
+.DS_Store
+
+# Logs / output
+*.log
+run.out
+run.err
+
+# Weird temp files (like your ._lgd-nfy0)
+._*
