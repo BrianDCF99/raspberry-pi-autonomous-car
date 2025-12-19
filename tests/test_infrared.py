@@ -1,4 +1,4 @@
-from carbot.hardware.sensors.infrared import InfraredController
+from carbot.controllers.freenove.infrared import InfraredController
 from time import sleep
 
 infr_ctl = InfraredController()

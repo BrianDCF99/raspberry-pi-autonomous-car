@@ -1,5 +1,5 @@
 from time import sleep
-from carbot.actuators.servo import Servos
+from carbot.controllers.freenove.servo import Servos
 
 def sweep(move_fn, start: int, end: int, step: int, delay: float = 0.005) -> None:
     if step <= 0:

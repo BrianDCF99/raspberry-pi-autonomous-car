@@ -1,4 +1,4 @@
-from carbot.hardware.sensors.ultrasonic import Ultrasonics
+from carbot.controllers.freenove.ultrasonic import Ultrasonics
 from time import sleep
 
 ult_ctl = Ultrasonics()

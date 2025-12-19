@@ -1,5 +1,5 @@
 from enum import StrEnum
-from freenove.servo import Servo
+from vendor.servo import Servo
 
 PAN_MIN, PAN_MAX = 10, 170
 TILT_MIN, TILT_MAX = 80, 180
