@@ -6,7 +6,11 @@ ult_ctl = Ultrasonics()
 try:
     while True:
         distance = ult_ctl.get_distance()
-        message = f'Distance: {distance} cm' if distance is not None else 'No Distance Measured'
+        message = (
+            f"Distance: {distance} cm"
+            if distance is not None
+            else "No Distance Measured"
+        )
         print(message)
         sleep(0.5)
 

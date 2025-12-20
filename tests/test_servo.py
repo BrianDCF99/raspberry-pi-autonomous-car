@@ -1,7 +1,33 @@
+import argparse
+from collections.abc import Callable
 from time import sleep
-from carbot.controllers.freenove.servo import Servos
 
-def sweep(move_fn, start: int, end: int, step: int, delay: float = 0.005) -> None:
+# from carbot.controllers.freenove.servo_controller import ServoController
+from carbot.config.loader import load_servo_config
+from carbot.contracts.servo_controller import ServoController
+from carbot.controllers.fake.servo_controller import FakeServoController
+from carbot.drivers.servo_driver import ServoDriver
+
+CONTROLLERS: dict[str, Callable[[], ServoController]] = {
+    "test": FakeServoController,
+    # "freenove": FreenoveServoController,
+}
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser()
+    p.add_argument("--controller", choices=sorted(CONTROLLERS), default="test")
+    p.add_argument("--servo-cfg", default="freenove")
+    return p.parse_args()
+
+
+def sweep(
+    move_fn: Callable[[int], None],
+    start: int,
+    end: int,
+    step: int,
+    delay: float = 0.005,
+) -> None:
     if step <= 0:
         raise ValueError("step must be > 0")
 
@@ -12,30 +38,40 @@ def sweep(move_fn, start: int, end: int, step: int, delay: float = 0.005) -> Non
         move_fn(angle)
         sleep(delay)
 
-servo_ctl = Servos()
 
-try:
-    for i in range(0,3):
-        sweep(servo_ctl.set_pan_angle,  90, 150, step=1)
-        sweep(servo_ctl.set_pan_angle, 150,  30, step=1)
-        sweep(servo_ctl.set_pan_angle, 30, 90, step= 1)
+def main() -> int:
+    args = parse_args()
 
-        sweep(servo_ctl.set_tilt_angle, 90,  80, step=1)
-        sweep(servo_ctl.set_tilt_angle, 80, 130, step=1)
-        sweep(servo_ctl.set_tilt_angle, 130, 90, step=1)
+    servo_ctl = CONTROLLERS[args.controller]()
+    servo_cfg = load_servo_config(args.servo_cfg)
+
+    driver = ServoDriver(servo_ctl, servo_cfg)
+
+    try:
+        for _ in range(3):
+            sweep(driver.set_pan, 0, 60, step=1)
+            sweep(driver.set_pan, 60, -60, step=1)
+            sweep(driver.set_pan, -60, 0, step=1)
+
+            sweep(driver.set_tilt, 0, -10, step=1)
+            sweep(driver.set_tilt, -10, 45, step=1)
+            sweep(driver.set_tilt, 45, 0, step=1)
+
+        # driver.set_tilt(80)
+        # driver.set_pan(30)
+        # sleep(90)
+
+        # driver.set_tilt(80)
+        # driver.set_pan(160)
+        # sleep(90)
+
+    except KeyboardInterrupt:
+        return 130
+
+    finally:
+        if driver is not None:
+            driver.close()
 
 
-    # servo_ctl.set_tilt_angle(80)
-    # servo_ctl.set_pan_angle(30)
-    # sleep(90)
-
-    # servo_ctl.set_tilt_angle(80)
-    # servo_ctl.set_pan_angle(160)
-    # sleep(90)
-
-
-except KeyboardInterrupt:
-    pass
-
-finally:
-    servo_ctl.close()
+if __name__ == "__main__":
+    raise SystemExit(main())

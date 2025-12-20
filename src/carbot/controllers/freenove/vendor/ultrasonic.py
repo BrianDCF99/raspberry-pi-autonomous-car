@@ -3,12 +3,16 @@ import warnings
 
 
 class Ultrasonic:
-    def __init__(self, trigger_pin: int = 27, echo_pin: int = 22, max_distance: float = 3.0):
+    def __init__(
+        self, trigger_pin: int = 27, echo_pin: int = 22, max_distance: float = 3.0
+    ):
         # Initialize the Ultrasonic class and set up the distance sensor.
-        warnings.filterwarnings("ignore", category = DistanceSensorNoEcho)
-        warnings.filterwarnings("ignore", category = PWMSoftwareFallback)  # Ignore PWM software fallback warnings
+        warnings.filterwarnings("ignore", category=DistanceSensorNoEcho)
+        warnings.filterwarnings(
+            "ignore", category=PWMSoftwareFallback
+        )  # Ignore PWM software fallback warnings
         self.trigger_pin = trigger_pin  # Set the trigger pin number
-        self.echo_pin = echo_pin        # Set the echo pin number
+        self.echo_pin = echo_pin  # Set the echo pin number
         self.max_distance: float = float(max_distance)  # Set the maximum distance
         self.sensor = DistanceSensor(
             echo=self.echo_pin,
@@ -31,7 +35,9 @@ class Ultrasonic:
         """
         try:
             distance = self.sensor.distance * 100  # Get the distance in centimeters
-            return round(float(distance), 1)  # Return the distance rounded to one decimal place
+            return round(
+                float(distance), 1
+            )  # Return the distance rounded to one decimal place
         except RuntimeWarning as e:
             print(f"Warning: {e}")
             return None
