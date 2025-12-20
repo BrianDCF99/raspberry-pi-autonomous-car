@@ -10,25 +10,28 @@ from carbot.config.loader import load_motor_config
 from carbot.drivers.motor_driver import MotorDriver
 
 
+CONTROLLERS: dict[str, type[MotorController]] = {
+    "test": FakeMotorController,
+    "pi": FreenoveMotorController,
+}
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--hardware", choices=["test", "pi"], default="test")
+    p.add_argument("--controller", choices=["test", "pi"], default="test")
     p.add_argument("--car-cfg", default="slow_car")
     return p.parse_args()
 
-def build_motor_controller( device: str ) -> MotorController:
-    if device == "test":
-        return FakeMotorController()
-    if device == "pi":
-        return FreenoveMotorController()
-    raise ValueError(f"Invalid device: {device!r}")
-
+def build_motor_controller(device: str) -> MotorController:
+    try:
+        return CONTROLLERS[device]()
+    except KeyError as e:
+        raise ValueError(f"Invalid device: {device!r}") from e
 
 def main() -> int:
     args = parse_args()
 
-    motor_ctl = build_motor_controller(args.hardware)
+    motor_ctl = build_motor_controller(args.controller)
     motor_cfg = load_motor_config(args.car_cfg)
 
     driver = MotorDriver(motor_ctl, motor_cfg)
