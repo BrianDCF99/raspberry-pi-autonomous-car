@@ -4,12 +4,12 @@ from carbot.contracts.motor_controller import MotorController
 
 class MotorDriver:
     def __init__(self, controller: MotorController, cfg: MotorConfig) -> None:
-        self._ctlr = controller
+        self._controller = controller
         self._cfg = cfg
 
     def close(self) -> None:
         self.drive(0, 0)
-        self._ctlr.close()
+        self._controller.close()
 
     ## Negative steer differential == Left Turn
     def drive(self, throttle: int, steer_differential: int) -> None:
@@ -22,7 +22,7 @@ class MotorDriver:
         rpow = self._clamp(rpow)
         lpow = self._clamp(lpow)
 
-        self._ctlr.set_wheels(lpow, lpow, rpow, rpow)
+        self._controller.set_wheels(lpow, lpow, rpow, rpow)
 
     def _clamp(self, power: int) -> int:
         max_pow = self._cfg.max_power
