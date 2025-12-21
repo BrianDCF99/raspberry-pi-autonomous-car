@@ -2,7 +2,7 @@ import argparse
 from collections.abc import Callable
 from time import sleep
 
-# from carbot.controllers.freenove.servo_controller import ServoController
+from carbot.controllers.freenove.servo_controller import FreenoveServoController
 from carbot.config.loader import load_servo_config
 from carbot.contracts.servo_controller import ServoController
 from carbot.controllers.fake.servo_controller import FakeServoController
@@ -10,7 +10,7 @@ from carbot.drivers.servo_driver import ServoDriver
 
 CONTROLLERS: dict[str, Callable[[], ServoController]] = {
     "test": FakeServoController,
-    # "freenove": FreenoveServoController,
+    "freenove": FreenoveServoController,
 }
 
 
@@ -65,6 +65,7 @@ def main() -> int:
         # driver.set_pan(160)
         # sleep(90)
 
+        return 0
     except KeyboardInterrupt:
         return 130
 

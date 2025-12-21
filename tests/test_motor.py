@@ -4,7 +4,7 @@ import argparse
 from collections.abc import Callable
 from time import sleep
 
-# from carbot.controllers.freenove.motor_controller import FreenoveMotorController
+from carbot.controllers.freenove.motor_controller import FreenoveMotorController
 from carbot.config.loader import load_motor_config
 from carbot.contracts.motor_controller import MotorController
 from carbot.controllers.fake.motor_controller import FakeMotorController
@@ -12,7 +12,7 @@ from carbot.drivers.motor_driver import MotorDriver
 
 CONTROLLERS: dict[str, Callable[[], MotorController]] = {
     "test": FakeMotorController,
-    # "freenove": FreenoveMotorController,
+    "freenove": FreenoveMotorController,
 }
 
 
@@ -32,8 +32,37 @@ def main() -> int:
     driver = MotorDriver(motor_ctl, motor_cfg)
 
     try:
-        driver.drive(2500, 0)
-        sleep(2)
+         # forward
+        driver.drive(1500, 0)
+        sleep(1)
+
+        # backward
+        driver.drive(-1500, 0)
+        sleep(1)
+
+        # in-place right
+        driver.drive(0, 1500)
+        sleep(1)
+
+        # in-place left
+        driver.drive(0, -1500)
+        sleep(1)
+
+        # forward-right arc
+        driver.drive(1500, 1500)
+        sleep(1)
+
+        # backward-right arc
+        driver.drive(-1500, -1500)
+        sleep(1)
+
+        # forward-left arc
+        driver.drive(1500, -1500)
+        sleep(1)
+
+        # backward-left arc
+        driver.drive(-1500, 1500)
+        sleep(1)
         return 0
     except KeyboardInterrupt:
         return 130
