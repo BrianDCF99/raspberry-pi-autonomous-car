@@ -4,9 +4,9 @@ from carbot.controllers.freenove.vendor.infrared import Infrared
 
 class FreenoveInfraredController(InfraredController):
     _VENDOR_CH: dict[Channel, int] = {
-        Channel.LEFT: 3,
+        Channel.LEFT: 1,
         Channel.MIDDLE: 2,
-        Channel.RIGHT: 1,
+        Channel.RIGHT: 3,
     }
 
     def __init__(self) -> None:
