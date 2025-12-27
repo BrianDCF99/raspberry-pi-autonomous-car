@@ -1,47 +1,50 @@
 from __future__ import annotations
-from collections.abc import Callable
-import argparse
-from time import sleep
-from carbot.contracts.ultrasonic_controller import UltrasonicController
-from carbot.controllers.freenove.ultrasonic_controller import FreenoveUltrasonicController
-from carbot.controllers.fake.ultrasonic_controller import FakeUltrasonicController
-from carbot.drivers.ultrasonic_driver import UltrasonicDriver
 
-CONTROLLERS: dict[str, Callable[[], UltrasonicController]] = {
-    "test": FakeUltrasonicController,
-    "freenove": FreenoveUltrasonicController,
-}
+import argparse
+
+from carbot.config.loader import load_run_config
+from carbot.factories.app_factory import build_app
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--controller", choices=sorted(CONTROLLERS), default="test")
-    p.add_argument("--hz", type=float, default=2)
+    p.add_argument("--config", default="ultrasonic_test")
     return p.parse_args()
 
+
 def main() -> int:
-    print("Starting")
     args = parse_args()
 
-    ultra_clt = CONTROLLERS[args.controller]()
-    ultra_driver = UltrasonicDriver(ultra_clt)
+    cfg = load_run_config(args.config)
+    app = build_app(cfg)
+
+    assert app.ultrasonic is not None
+
+    assert app.motor is None
+    assert app.servo is None
+    assert app.infrared is None
+    assert app.camera is None
+    assert app.streaming is None
+
+    driver = app.ultrasonic
+    driver.start()
 
     try:
+        last_seq: int | None = None
         while True:
-            distance = ultra_driver.read()
-            message = (
-                f"Distance: {distance} cm"
-                if distance is not None
-                else "No Distance Measured"
-            )
-            print(message)
-            sleep(0.5)
+            res = driver.wait_next(last_seq, timeout=1.0)
+            if res is None:
+                continue
+
+            seq, dist = res
+            last_seq = seq
+            print(f"Distance: {dist:.3f}")
 
     except KeyboardInterrupt:
         return 130
 
     finally:
-        ultra_driver.close()
-
+        driver.close()
 
 
 if __name__ == "__main__":

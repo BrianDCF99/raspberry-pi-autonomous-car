@@ -1,39 +1,45 @@
+from __future__ import annotations
+
 import argparse
-from collections.abc import Callable
-from time import sleep
 
-from carbot.contracts.infrared_controller import InfraredController
-from carbot.controllers.fake.infrared_controller import FakeInfraredController
-from carbot.controllers.freenove.infrared_controller import FreenoveInfraredController
-from carbot.drivers.infrared_driver import InfraredDriver
-
-CONTROLLERS: dict[str, Callable[[], InfraredController]] = {
-    "test": FakeInfraredController,
-    "freenove": FreenoveInfraredController,
-}
+from carbot.config.loader import load_run_config
+from carbot.factories.app_factory import build_app
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--controller", choices=sorted(CONTROLLERS), default="test")
-    p.add_argument("--hz", type=float, default=2)
+    p.add_argument("--config", default="infrared_test")
     return p.parse_args()
 
 
 def main() -> int:
     args = parse_args()
 
-    infrared_ctl = CONTROLLERS[args.controller]()
-    driver = InfraredDriver(infrared_ctl)
+    cfg = load_run_config(args.config)
+    app = build_app(cfg)
 
-    period = 1.0 / args.hz if args.hz > 0 else 0.5
+    assert app.infrared is not None
+
+    assert app.motor is None
+    assert app.servo is None
+    assert app.ultrasonic is None
+    assert app.camera is None
+    assert app.streaming is None
+
+    driver = app.infrared
+    driver.start()
 
     try:
+        last_seq: int | None = None
         while True:
-            bits = driver.read_bits()
-            l, m, r = driver.read_tuple()
-            print(f"Bits:  {bits:03b} \t Tuple: {l, m ,r}")
-            sleep(period)
+            sample = driver.wait_next(last_seq, timeout=1.0)
+            if sample is None:
+                continue
+
+            last_seq = sample.seq
+            print(
+                f"Bits:  {sample.bits:03b}\tTuple: {(sample.right, sample.middle, sample.left)}"
+            )
 
     except KeyboardInterrupt:
         return 130

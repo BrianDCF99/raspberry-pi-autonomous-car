@@ -1,0 +1,4 @@
+camera_controller: mac          # test | mac | pi
+camera_cfg: default_config
+camera_policy: default_policy
+networking: default_config

@@ -1,0 +1,14 @@
+motor_controller: freenove
+motor_cfg: fast
+
+servo_controller: freenove
+servo_cfg: default_servo
+
+infrared_controller: freenove
+ultrasonic_controller: freenove
+
+camera_controller: pi
+camera_cfg: default_config
+camera_policy: default_policy
+
+networking: networking_config

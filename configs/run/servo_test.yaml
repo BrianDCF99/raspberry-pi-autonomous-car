@@ -1,0 +1,2 @@
+servo_controller: test         # test | freenove
+servo_cfg: default_config

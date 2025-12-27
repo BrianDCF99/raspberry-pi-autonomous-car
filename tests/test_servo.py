@@ -1,23 +1,16 @@
+from __future__ import annotations
+
 import argparse
-from collections.abc import Callable
 from time import sleep
+from typing import Callable
 
-from carbot.config.loader import load_servo_config
-from carbot.contracts.servo_controller import ServoController
-from carbot.controllers.fake.servo_controller import FakeServoController
-from carbot.controllers.freenove.servo_controller import FreenoveServoController
-from carbot.drivers.servo_driver import ServoDriver
-
-CONTROLLERS: dict[str, Callable[[], ServoController]] = {
-    "test": FakeServoController,
-    "freenove": FreenoveServoController,
-}
+from carbot.config.loader import load_run_config
+from carbot.factories.app_factory import build_app
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
-    p.add_argument("--controller", choices=sorted(CONTROLLERS), default="test")
-    p.add_argument("--servo-cfg", default="freenove")
+    p.add_argument("--config", default="servo_test")
     return p.parse_args()
 
 
@@ -42,11 +35,18 @@ def sweep(
 def main() -> int:
     args = parse_args()
 
-    servo_ctl = CONTROLLERS[args.controller]()
-    servo_cfg = load_servo_config(args.servo_cfg)
+    cfg = load_run_config(args.config)
+    app = build_app(cfg)
 
-    driver = ServoDriver(servo_ctl, servo_cfg)
+    assert app.servo is not None
 
+    assert app.motor is None
+    assert app.infrared is None
+    assert app.ultrasonic is None
+    assert app.camera is None
+    assert app.streaming is None
+
+    driver = app.servo
     try:
         for _ in range(3):
             sweep(driver.set_pan, 0, 60, step=1)

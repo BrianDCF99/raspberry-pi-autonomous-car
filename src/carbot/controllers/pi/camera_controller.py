@@ -5,12 +5,13 @@ from time import monotonic_ns
 import cv2 as cv
 from picamera2 import Picamera2
 
+from carbot.config.models import CameraConfig
 from carbot.contracts.camera_controller import BGRFrame, CameraController
 
 
 class PiCameraController(CameraController):
-    def __init__(self, *, width: int = 640, height: int = 480, fps: int = 30) -> None:
-        if fps <= 0:
+    def __init__(self, cfg: CameraConfig) -> None:
+        if cfg.fps <= 0:
             raise ValueError("fps must be > 0")
 
         self._cam = Picamera2()
@@ -19,13 +20,13 @@ class PiCameraController(CameraController):
         # Prefer simple FrameRate control; fall back to FrameDurationLimits if needed.
         try:
             cfg = self._cam.create_video_configuration(
-                main={"size": (width, height), "format": "RGB888"},
-                controls={"FrameRate": fps},
+                main={"size": (cfg.width, cfg.height), "format": "RGB888"},
+                controls={"FrameRate": cfg.fps},
             )
         except TypeError:
-            frame_us = int(1_000_000 / fps)
+            frame_us = int(1_000_000 / cfg.fps)
             cfg = self._cam.create_video_configuration(
-                main={"size": (width, height), "format": "RGB888"},
+                main={"size": (cfg.width, cfg.height), "format": "RGB888"},
                 controls={"FrameDurationLimits": (frame_us, frame_us)},
             )
 
@@ -45,7 +46,7 @@ class PiCameraController(CameraController):
         if not self._started:
             raise RuntimeError("Camera not started")
 
-        rgb = self._cam.capture_array()  # RGB888 because of config
+        rgb = self._cam.capture_array()
         if rgb is None:
             return None
 

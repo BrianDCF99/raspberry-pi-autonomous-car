@@ -2,25 +2,26 @@ from time import monotonic_ns
 
 import cv2 as cv
 
+from carbot.config.models import CameraConfig
 from carbot.contracts.camera_controller import BGRFrame, CameraController
 
 
 class MacCameraController(CameraController):
-    def __init__(
-        self,
-        device_idx: int = 0,
-        width: int = 640,
-        height: int = 480,
-        fps: int = 30,
-    ) -> None:
-        cap = cv.VideoCapture(device_idx, cv.CAP_AVFOUNDATION)
+    def __init__(self, cfg: CameraConfig) -> None:
+        if cfg.fps <= 0:
+            raise ValueError("fps must be > 0")
 
-        if not self._cap.isOpened():
-            raise RuntimeError(f"Failed to open Mac's camera on index: {device_idx}")
+        cap = cv.VideoCapture(cfg.device_idx, cv.CAP_AVFOUNDATION)
 
-        cap.set(cv.CAP_PROP_FRAME_WIDTH, width)
-        cap.set(cv.CAP_PROP_FRAME_HEIGHT, height)
-        cap.set(cv.CAP_PROP_FPS, fps)
+        if not cap.isOpened():
+            cap.release()
+            raise RuntimeError(
+                f"Failed to open Mac's camera on index: {cfg.device_idx}"
+            )
+
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, cfg.width)
+        cap.set(cv.CAP_PROP_FRAME_HEIGHT, cfg.height)
+        cap.set(cv.CAP_PROP_FPS, cfg.fps)
 
         self._cap = cap
 
@@ -31,4 +32,4 @@ class MacCameraController(CameraController):
         ok, img = self._cap.read()
         if not ok or img is None:
             return None
-        return BGRFrame(img=img, timestamp_ns=monotonic_ns())
+        return BGRFrame(img=img, timestamp=monotonic_ns())
