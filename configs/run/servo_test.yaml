@@ -1,2 +1,2 @@
-servo_controller: test         # test | freenove
+servo_controller: freenove         # test | freenove
 servo_cfg: default_config

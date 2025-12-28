@@ -38,7 +38,7 @@ def main() -> int:
 
             last_seq = sample.seq
             print(
-                f"Bits:  {sample.bits:03b}\tTuple: {(sample.right, sample.middle, sample.left)}"
+                f"Bits:  {sample.bits:03b}\tTuple: {(sample.left, sample.middle, sample.right)}"
             )
 
     except KeyboardInterrupt:

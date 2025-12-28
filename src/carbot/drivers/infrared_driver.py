@@ -62,16 +62,6 @@ class InfraredDriver:
         with self._lock:
             return self._latest
 
-    def latest_tuple(self) -> tuple[int, int, int] | None:
-        s = self.latest()
-        if s is None:
-            return None
-        return (s.right, s.middle, s.left)
-
-    def latest_bits(self) -> int | None:
-        s = self.latest()
-        return None if s is None else s.bits
-
     def wait_next(
         self,
         last_seq: int | None = None,

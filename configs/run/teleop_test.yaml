@@ -1,0 +1,5 @@
+motor_controller: freenove
+motor_cfg: fast
+
+servo_controller: freenove
+servo_cfg: default_config

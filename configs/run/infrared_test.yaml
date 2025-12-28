@@ -1,2 +1,2 @@
-infrared_controller: test
+infrared_controller: freenove     # test | freenove
 infrared_cfg: default_config

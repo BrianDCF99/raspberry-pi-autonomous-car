@@ -1,2 +1,2 @@
-motor_controller: test         # test | freenove
+motor_controller: freenove        # test | freenove
 motor_cfg: fast

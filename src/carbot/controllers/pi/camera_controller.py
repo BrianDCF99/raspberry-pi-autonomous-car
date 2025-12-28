@@ -17,20 +17,19 @@ class PiCameraController(CameraController):
         self._cam = Picamera2()
         self._started = False
 
-        # Prefer simple FrameRate control; fall back to FrameDurationLimits if needed.
         try:
-            cfg = self._cam.create_video_configuration(
+            video_cfg = self._cam.create_video_configuration(
                 main={"size": (cfg.width, cfg.height), "format": "RGB888"},
                 controls={"FrameRate": cfg.fps},
             )
         except TypeError:
             frame_us = int(1_000_000 / cfg.fps)
-            cfg = self._cam.create_video_configuration(
+            video_cfg = self._cam.create_video_configuration(
                 main={"size": (cfg.width, cfg.height), "format": "RGB888"},
                 controls={"FrameDurationLimits": (frame_us, frame_us)},
             )
 
-        self._cam.configure(cfg)
+        self._cam.configure(video_cfg)
         self._cam.start()
         self._started = True
 
@@ -51,4 +50,4 @@ class PiCameraController(CameraController):
             return None
 
         bgr = cv.cvtColor(rgb, cv.COLOR_RGB2BGR)
-        return BGRFrame(img=bgr, timestamp_ns=monotonic_ns())
+        return BGRFrame(img=bgr, timestamp=monotonic_ns())
