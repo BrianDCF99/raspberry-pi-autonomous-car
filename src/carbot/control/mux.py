@@ -14,7 +14,7 @@ class Source(Protocol[T]):
 @dataclass(frozen=True, slots=True)
 class SourceEntry(Generic[T]):
     source: Source[T]
-    max_age_s: float  # if command older than this, treat as stale
+    max_age_s: float
     priority: int     # smaller = higher priority
     name: str = ""
 
