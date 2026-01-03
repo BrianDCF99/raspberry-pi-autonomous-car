@@ -1,9 +1,9 @@
+# carbot/inputs/terminal_kb_teleop.py
 from __future__ import annotations
 
 import os
 import sys
 import threading
-from dataclasses import dataclass
 from select import select
 from time import monotonic
 from typing import Final
@@ -14,47 +14,12 @@ import tty
 
 from carbot.config.models import TeleopConfig, TeleopKeymap
 from carbot.control.commands import MotorCommand, ServoCommand
-from carbot.control.mux import Source
+from carbot.inputs.teleop import Teleop
 
 
-# For pretty-printing help text (reverse of config aliases).
-_REVERSE_KEY_ALIASES: dict[str, str] = {
-    "\x1b[A": "UP",
-    "\x1b[B": "DOWN",
-    "\x1b[C": "RIGHT",
-    "\x1b[D": "LEFT",
-    " ": "SPACE",
-    "\r": "ENTER",
-    "\t": "TAB",
-    "\x1b": "ESC",
-    "\x03": "CTRL_C",
-}
-
-
-def _fmt_keys(keys: list[str]) -> str:
-    out: list[str] = []
-    for k in keys:
-        alias = _REVERSE_KEY_ALIASES.get(k)
-        if alias is not None:
-            out.append(alias)
-            continue
-
-        if len(k) == 1 and k.isprintable():
-            out.append(k)
-            continue
-
-        out.append(k.encode("utf-8", "backslashreplace").decode("utf-8"))
-
-    return " / ".join(out) if out else "—"
-
-
-class KeyboardTeleop(Source[MotorCommand]):
+class TerminalKeyboardTeleop(Teleop):
     """
-    Reads keyboard input (raw terminal) on a background thread and exposes the
-    latest MotorCommand / ServoCommand.
-
-    - Does NOT touch hardware.
-    - Implements Source[MotorCommand] for PriorityMux via latest().
+    Reads sys.stdin in raw TTY mode (escape sequences for arrows) and emits commands.
     """
 
     _READ_SIZE: Final[int] = 64
@@ -79,10 +44,13 @@ class KeyboardTeleop(Source[MotorCommand]):
         self._thread: threading.Thread | None = None
         self._thread_exc: BaseException | None = None
 
-        # debug
         self._last_key: str | None = None
         self._last_bytes: bytes = b""
         self._last_read_t: float = 0.0
+
+    @property
+    def cfg(self) -> TeleopConfig:
+        return self._cfg
 
     @property
     def keymap(self) -> TeleopKeymap:
@@ -105,44 +73,11 @@ class KeyboardTeleop(Source[MotorCommand]):
         with self._lock:
             return self._last_key, self._last_bytes, self._last_read_t
 
-    def help_text(self, *, teleop_cfg_name: str | None = None) -> str:
-        km = self._keys
-        header = "\n=== TELEOP CONTROLS ===\n"
-        if teleop_cfg_name:
-            header += f"teleop config: {teleop_cfg_name}\n"
-        header += "\n"
-
-        return (
-            header
-            + "Motor:\n"
-            + f"  forward:    {_fmt_keys(km.motor_forward)}\n"
-            + f"  backward:   {_fmt_keys(km.motor_backward)}\n"
-            + f"  left:       {_fmt_keys(km.motor_left)}\n"
-            + f"  right:      {_fmt_keys(km.motor_right)}\n"
-            + f"  fwd-left:   {_fmt_keys(km.motor_fwd_left)}\n"
-            + f"  fwd-right:  {_fmt_keys(km.motor_fwd_right)}\n"
-            + f"  back-left:  {_fmt_keys(km.motor_back_left)}\n"
-            + f"  back-right: {_fmt_keys(km.motor_back_right)}\n"
-            + f"  stop:       {_fmt_keys(km.motor_stop)}\n"
-            + "\nServo:\n"
-            + f"  pan left:   {_fmt_keys(km.servo_pan_left)}\n"
-            + f"  pan right:  {_fmt_keys(km.servo_pan_right)}\n"
-            + f"  tilt up:    {_fmt_keys(km.servo_tilt_up)}\n"
-            + f"  tilt down:  {_fmt_keys(km.servo_tilt_down)}\n"
-            + f"  center:     {_fmt_keys(km.servo_center)}\n"
-            + "\nQuit:\n"
-            + f"  quit:       {_fmt_keys(km.quit)}\n"
-            + "\nNote: terminal is in RAW mode while running (no echo). That’s normal.\n"
-        )
-
     def start(self) -> None:
         if self._thread is not None:
-            raise RuntimeError("KeyboardTeleop already started")
-
+            raise RuntimeError("TerminalKeyboardTeleop already started")
         if not sys.stdin.isatty():
-            raise RuntimeError(
-                "stdin is not a TTY. Keyboard teleop needs an interactive terminal."
-            )
+            raise RuntimeError("stdin is not a TTY. Terminal keyboard teleop needs an interactive terminal.")
 
         self._stop.clear()
         self._quit.clear()
@@ -151,7 +86,7 @@ class KeyboardTeleop(Source[MotorCommand]):
 
         self._thread = threading.Thread(
             target=self._thread_main,
-            name="keyboard-teleop",
+            name="terminal-keyboard-teleop",
             daemon=True,
         )
         self._thread.start()
@@ -163,10 +98,6 @@ class KeyboardTeleop(Source[MotorCommand]):
         if t is not None:
             t.join(timeout=1.0)
 
-    def close(self) -> None:
-        self.stop()
-
-    # --- command sources ---
     def latest_motor(self) -> MotorCommand | None:
         with self._lock:
             if self._latest_motor is None:
@@ -181,12 +112,6 @@ class KeyboardTeleop(Source[MotorCommand]):
         with self._lock:
             return self._latest_servo
 
-    # Source[MotorCommand] contract for PriorityMux
-    def latest(self) -> MotorCommand | None:
-        return self.latest_motor()
-
-    # ---------------- internals ----------------
-
     def _thread_main(self) -> None:
         try:
             self._loop()
@@ -197,7 +122,6 @@ class KeyboardTeleop(Source[MotorCommand]):
 
     def _loop(self) -> None:
         fd = sys.stdin.fileno()
-
         old_term = termios.tcgetattr(fd)
         old_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
 
@@ -226,7 +150,6 @@ class KeyboardTeleop(Source[MotorCommand]):
                     k_norm = k.lower() if len(k) == 1 else k
                     with self._lock:
                         self._last_key = k_norm
-
                     self._handle_key(k_norm)
 
         finally:
@@ -248,7 +171,6 @@ class KeyboardTeleop(Source[MotorCommand]):
         if not buf:
             return None, buf
 
-        # arrow keys are ESC [ A/B/C/D
         if buf[0] == "\x1b":
             if len(buf) < 3:
                 return None, buf
@@ -269,7 +191,6 @@ class KeyboardTeleop(Source[MotorCommand]):
             self._latest_servo = ServoCommand.now(pan, tilt)
 
     def _handle_key(self, k: str) -> None:
-        # quit
         if k in self._keys.quit:
             self._quit.set()
             return
@@ -277,12 +198,10 @@ class KeyboardTeleop(Source[MotorCommand]):
         speed = int(self._cfg.speed)
         steer = int(self._cfg.steer)
 
-        # motor stop
         if k in self._keys.motor_stop:
             self._set_motor(0, 0)
             return
 
-        # motor
         if k in self._keys.motor_forward:
             self._set_motor(speed, 0)
             return
@@ -296,7 +215,6 @@ class KeyboardTeleop(Source[MotorCommand]):
             self._set_motor(0, -steer)
             return
 
-        # motor diagonals (arcs)
         if k in self._keys.motor_fwd_right:
             self._set_motor(speed, steer)
             return
@@ -310,7 +228,6 @@ class KeyboardTeleop(Source[MotorCommand]):
             self._set_motor(-speed, steer)
             return
 
-        # servo (relative angles)
         step = int(self._cfg.servo_step)
         pan_sign = -1 if self._cfg.invert_pan else 1
         tilt_sign = -1 if self._cfg.invert_tilt else 1
@@ -339,17 +256,5 @@ class KeyboardTeleop(Source[MotorCommand]):
             return
 
 
-@dataclass(frozen=True, slots=True)
-class MotorSource(Source[MotorCommand]):
-    teleop: KeyboardTeleop
-
-    def latest(self) -> MotorCommand | None:
-        return self.teleop.latest_motor()
-
-
-@dataclass(frozen=True, slots=True)
-class ServoSource(Source[ServoCommand]):
-    teleop: KeyboardTeleop
-
-    def latest(self) -> ServoCommand | None:
-        return self.teleop.latest_servo()
+# Back-compat for existing imports
+KeyboardTeleop = TerminalKeyboardTeleop

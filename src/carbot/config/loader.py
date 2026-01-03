@@ -12,6 +12,7 @@ from .models import (
     RunConfig,
     ServoConfig,
     UltrasonicConfig,
+    TeleopConfig,
 )
 
 _CONFIGS_DIR = Path(__file__).resolve().parents[3] / "configs"
@@ -79,6 +80,13 @@ def load_network_config(
     data = load_yaml_mapping(path)
     return NetworkConfig.from_mapping(data, path=path)
 
+def load_teleop_config(
+    name_or_path: str | Path, *, config_dir: str | Path | None = None
+) -> TeleopConfig:
+    base = Path(config_dir) if config_dir is not None else (_CONFIGS_DIR / "teleop")
+    path = resolve_config_path(name_or_path, config_dir=base)
+    data = load_yaml_mapping(path)
+    return TeleopConfig.from_mapping(data, path=path)
 
 def load_run_config(
     name_or_path: str | Path, *, config_dir: str | Path | None = None

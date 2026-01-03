@@ -14,7 +14,7 @@ class MotorCommand:
     def now(throttle: int, steer_differential: int) -> "MotorCommand":
         return MotorCommand(
             throttle=int(throttle),
-            steer_differential=int(steer_differential),
+            steer_differential=int(-steer_differential),
             ts=monotonic(),
         )
 

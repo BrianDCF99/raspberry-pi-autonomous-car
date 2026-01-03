@@ -3,102 +3,21 @@ from __future__ import annotations
 
 import signal
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
-import cv2 as cv
-
 from carbot.config.models import NetworkConfig
-from carbot.drivers.camera_driver import CameraDriver
+from carbot.vision.latest_store import LatestStore
 
 _BOUNDARY = b"--frame"
 
 
-class _JpegStore:
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._cond = threading.Condition(self._lock)
-        self._jpeg: bytes | None = None
-        self._timestamp_ns: int = 0
-
-    def set(self, jpeg: bytes, *, timestamp_ns: int) -> None:
-        with self._cond:
-            self._jpeg = jpeg
-            self._timestamp_ns = timestamp_ns
-            self._cond.notify_all()
-
-    def get(self) -> tuple[bytes | None, int]:
-        with self._lock:
-            return self._jpeg, self._timestamp_ns
-
-    def wait_newer(
-        self, *, last_timestamp_ns: int, stop_event: threading.Event, timeout_s: float
-    ) -> tuple[bytes | None, int]:
-        deadline = time.monotonic() + timeout_s
-        with self._cond:
-            while not stop_event.is_set():
-                jpeg = self._jpeg
-                ts = self._timestamp_ns
-                if jpeg is not None and ts != last_timestamp_ns:
-                    return jpeg, ts
-
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    return None, last_timestamp_ns
-
-                self._cond.wait(timeout=remaining)
-
-            return None, last_timestamp_ns
-
-
-class _JpegWorker(threading.Thread):
-    def __init__(
-        self,
-        *,
-        driver: CameraDriver,
-        store: _JpegStore,
-        stop_event: threading.Event,
-        jpeg_quality: int,
-        idle_sleep_s: float,
-    ) -> None:
-        super().__init__(name="mjpeg-jpeg-worker", daemon=True)
-        self._driver = driver
-        self._store = store
-        self._stop_event = stop_event
-        self._jpeg_quality = max(10, min(int(jpeg_quality), 95))
-        self._idle_sleep_s = float(idle_sleep_s)
-
-        self._last_frame_ts: int = 0
-
-    def run(self) -> None:
-        encode_params = [int(cv.IMWRITE_JPEG_QUALITY), self._jpeg_quality]
-
-        while not self._stop_event.is_set():
-            frame = self._driver.latest_frame()
-            if frame is None:
-                time.sleep(self._idle_sleep_s)
-                continue
-
-            if frame.timestamp == self._last_frame_ts:
-                time.sleep(self._idle_sleep_s)
-                continue
-
-            self._last_frame_ts = frame.timestamp
-
-            ok, buffer = cv.imencode(".jpg", frame.img, encode_params)
-            if not ok:
-                continue
-
-            self._store.set(buffer.tobytes(), timestamp_ns=frame.timestamp)
-
-
 class _ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    daemon_threads = True  # request threads won't block shutdown
+    daemon_threads = True
 
 
 class _Handler(BaseHTTPRequestHandler):
-    store: _JpegStore
+    store: LatestStore[bytes]
     stop_event: threading.Event
 
     def do_GET(self) -> None:  # noqa: N802
@@ -174,32 +93,26 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
     def log_message(self, fmt: str, *args) -> None:
-        return  # silence request spam
+        return
 
 
 class StreamingService:
-    def __init__(self, driver: CameraDriver, cfg: NetworkConfig) -> None:
-        self._driver = driver
+    def __init__(
+        self,
+        *,
+        jpeg_store: LatestStore[bytes],
+        cfg: NetworkConfig,
+    ) -> None:
         self._cfg = cfg
-
         self._stop_event = threading.Event()
-        self._store = _JpegStore()
-        self._jpeg_worker = _JpegWorker(
-            driver=self._driver,
-            store=self._store,
-            stop_event=self._stop_event,
-            jpeg_quality=cfg.jpeg_quality,
-            idle_sleep_s=cfg.idle_sleep_s,
-        )
 
         handler_cls = type("InjectedHandler", (_Handler,), {})
-        handler_cls.store = self._store
+        handler_cls.store = jpeg_store
         handler_cls.stop_event = self._stop_event
 
         self._httpd = _ThreadedHTTPServer((cfg.host, cfg.port), handler_cls)
 
     def serve_forever(self) -> None:
-        self._jpeg_worker.start()
         try:
             self._httpd.serve_forever(poll_interval=0.2)
         finally:
@@ -208,14 +121,9 @@ class StreamingService:
     def close(self) -> None:
         if self._stop_event.is_set():
             return
-
         self._stop_event.set()
-
         self._httpd.shutdown()
         self._httpd.server_close()
-
-        if self._jpeg_worker.is_alive():
-            self._jpeg_worker.join(timeout=2.0)
 
 
 def install_signal_handlers(stop_fn) -> None:

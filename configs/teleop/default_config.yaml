@@ -1,0 +1,32 @@
+speed: 1500
+steer: 1500
+servo_step: 20
+
+poll_s: 0.02
+deadman_s: 0.15
+
+invert_steer: false
+invert_pan: false
+invert_tilt: false
+
+debug_keys: false
+
+keymap:
+  quit: ["q", "CTRL_C"]
+
+  motor_forward: ["i", "UP"]
+  motor_backward: ["k"]
+  motor_left: ["j"]
+  motor_right: ["l"]
+  motor_stop: ["SPACE"]
+
+  motor_fwd_left: ["u"]
+  motor_fwd_right: ["o"]
+  motor_back_left: ["n"]
+  motor_back_right: ["."]
+
+  servo_pan_left: ["a"]
+  servo_pan_right: ["d"]
+  servo_tilt_up: ["w"]
+  servo_tilt_down: ["s"]
+  servo_center: ["c"]

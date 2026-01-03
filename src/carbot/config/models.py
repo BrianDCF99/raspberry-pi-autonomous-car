@@ -87,10 +87,17 @@ class InfraredConfig:
         allowed = {"hz", "time_limit"}
         forbid_unknown_keys(data, allowed, path=path)
 
-        def req_int(k: str) -> int:
-            return as_int(require_key(data, k, path=path), key=k, path=path)
+        hz = as_float(require_key(data, "hz", path=path), key="hz", path=path)
+        time_limit = as_float(
+            require_key(data, "time_limit", path=path), key="time_limit", path=path
+        )
 
-        return InfraredConfig(hz=req_int("hz"), time_limit=req_int("time_limit"))
+        if hz <= 0:
+            raise ValueError(f"Key 'hz' in {path} must be > 0; got {hz}")
+        if time_limit <= 0:
+            raise ValueError(f"Key 'time_limit' in {path} must be > 0; got {time_limit}")
+
+        return InfraredConfig(hz=hz, time_limit=time_limit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,10 +110,17 @@ class UltrasonicConfig:
         allowed = {"hz", "time_limit"}
         forbid_unknown_keys(data, allowed, path=path)
 
-        def req_int(k: str) -> int:
-            return as_int(require_key(data, k, path=path), key=k, path=path)
+        hz = as_float(require_key(data, "hz", path=path), key="hz", path=path)
+        time_limit = as_float(
+            require_key(data, "time_limit", path=path), key="time_limit", path=path
+        )
 
-        return UltrasonicConfig(hz=req_int("hz"), time_limit=req_int("time_limit"))
+        if hz <= 0:
+            raise ValueError(f"Key 'hz' in {path} must be > 0; got {hz}")
+        if time_limit <= 0:
+            raise ValueError(f"Key 'time_limit' in {path} must be > 0; got {time_limit}")
+
+        return UltrasonicConfig(hz=hz, time_limit=time_limit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +226,289 @@ class NetworkConfig:
         )
 
 
+
+_KEY_ALIASES: dict[str, str] = {
+    "UP": "\x1b[A",
+    "DOWN": "\x1b[B",
+    "RIGHT": "\x1b[C",
+    "LEFT": "\x1b[D",
+    "SPACE": " ",
+    "ENTER": "\r",
+    "TAB": "\t",
+    "ESC": "\x1b",
+    "CTRL_C": "\x03",
+}
+
+
+def _parse_key_token(tok: str, *, key: str, path: Path) -> str:
+    s = tok.strip()
+    if not s:
+        raise ValueError(f"Key {key!r} in {path} contains an empty key token")
+
+    # Named aliases
+    alias = s.upper()
+    if alias in _KEY_ALIASES:
+        return _KEY_ALIASES[alias]
+
+    # Hex escape like \x03 (single char only)
+    if s.startswith("\\x"):
+        try:
+            decoded = bytes(s, "utf-8").decode("unicode_escape")
+        except Exception as e:
+            raise ValueError(
+                f"Key {key!r} in {path} has invalid escape token {s!r}"
+            ) from e
+        if len(decoded) != 1:
+            raise ValueError(
+                f"Key {key!r} in {path} escape token must decode to 1 char: {s!r}"
+            )
+        return decoded
+
+    # Single character
+    if len(s) == 1:
+        return s.lower()
+
+    raise ValueError(
+        f"Key {key!r} in {path} has invalid token {s!r}. "
+        f"Use single characters (e.g. 'w') or aliases like UP/DOWN/LEFT/RIGHT/SPACE/CTRL_C, "
+        f"or escapes like '\\x03'."
+    )
+
+
+def _as_key_list(v: Any, *, key: str, path: Path) -> list[str]:
+    if v is None:
+        return []
+    if isinstance(v, str):
+        items = [v]
+    elif isinstance(v, list):
+        items = v
+    else:
+        raise ValueError(
+            f"Key {key!r} in {path} must be a string or list of strings; got {type(v).__name__}"
+        )
+
+    out: list[str] = []
+    for it in items:
+        if not isinstance(it, str):
+            raise ValueError(
+                f"Key {key!r} in {path} must contain only strings; got {type(it).__name__}"
+            )
+        out.append(_parse_key_token(it, key=key, path=path))
+    return out
+
+
+@dataclass(frozen=True, slots=True)
+class TeleopKeymap:
+    # quitting
+    quit: list[str]
+
+    # motor
+    motor_forward: list[str]
+    motor_backward: list[str]
+    motor_left: list[str]
+    motor_right: list[str]
+    motor_stop: list[str]
+
+    motor_fwd_left: list[str]
+    motor_fwd_right: list[str]
+    motor_back_left: list[str]
+    motor_back_right: list[str]
+
+    # servo
+    servo_pan_left: list[str]
+    servo_pan_right: list[str]
+    servo_tilt_up: list[str]
+    servo_tilt_down: list[str]
+    servo_center: list[str]
+
+    @staticmethod
+    def defaults() -> "TeleopKeymap":
+        # canonical fallback if YAML is missing/partial
+        return TeleopKeymap(
+            quit=["q", _KEY_ALIASES["CTRL_C"]],
+            motor_forward=[_KEY_ALIASES["UP"]],
+            motor_backward=[_KEY_ALIASES["DOWN"]],
+            motor_left=[_KEY_ALIASES["LEFT"]],
+            motor_right=[_KEY_ALIASES["RIGHT"]],
+            motor_stop=[_KEY_ALIASES["SPACE"]],
+            motor_fwd_left=["u"],
+            motor_fwd_right=["o"],
+            motor_back_left=["j"],
+            motor_back_right=["l"],
+            servo_pan_left=["a"],
+            servo_pan_right=["d"],
+            servo_tilt_up=["w"],
+            servo_tilt_down=["s"],
+            servo_center=["c"],
+        )
+
+    @staticmethod
+    def from_mapping(data: Mapping[str, Any], *, path: Path) -> "TeleopKeymap":
+        allowed = {
+            "quit",
+            "motor_forward",
+            "motor_backward",
+            "motor_left",
+            "motor_right",
+            "motor_stop",
+            "motor_fwd_left",
+            "motor_fwd_right",
+            "motor_back_left",
+            "motor_back_right",
+            "servo_pan_left",
+            "servo_pan_right",
+            "servo_tilt_up",
+            "servo_tilt_down",
+            "servo_center",
+        }
+        forbid_unknown_keys(data, allowed, path=path)
+
+        d = TeleopKeymap.defaults()
+
+        return TeleopKeymap(
+            quit=_as_key_list(data.get("quit", d.quit), key="quit", path=path),
+            motor_forward=_as_key_list(
+                data.get("motor_forward", d.motor_forward),
+                key="motor_forward",
+                path=path,
+            ),
+            motor_backward=_as_key_list(
+                data.get("motor_backward", d.motor_backward),
+                key="motor_backward",
+                path=path,
+            ),
+            motor_left=_as_key_list(
+                data.get("motor_left", d.motor_left), key="motor_left", path=path
+            ),
+            motor_right=_as_key_list(
+                data.get("motor_right", d.motor_right), key="motor_right", path=path
+            ),
+            motor_stop=_as_key_list(
+                data.get("motor_stop", d.motor_stop), key="motor_stop", path=path
+            ),
+            motor_fwd_left=_as_key_list(
+                data.get("motor_fwd_left", d.motor_fwd_left),
+                key="motor_fwd_left",
+                path=path,
+            ),
+            motor_fwd_right=_as_key_list(
+                data.get("motor_fwd_right", d.motor_fwd_right),
+                key="motor_fwd_right",
+                path=path,
+            ),
+            motor_back_left=_as_key_list(
+                data.get("motor_back_left", d.motor_back_left),
+                key="motor_back_left",
+                path=path,
+            ),
+            motor_back_right=_as_key_list(
+                data.get("motor_back_right", d.motor_back_right),
+                key="motor_back_right",
+                path=path,
+            ),
+            servo_pan_left=_as_key_list(
+                data.get("servo_pan_left", d.servo_pan_left),
+                key="servo_pan_left",
+                path=path,
+            ),
+            servo_pan_right=_as_key_list(
+                data.get("servo_pan_right", d.servo_pan_right),
+                key="servo_pan_right",
+                path=path,
+            ),
+            servo_tilt_up=_as_key_list(
+                data.get("servo_tilt_up", d.servo_tilt_up),
+                key="servo_tilt_up",
+                path=path,
+            ),
+            servo_tilt_down=_as_key_list(
+                data.get("servo_tilt_down", d.servo_tilt_down),
+                key="servo_tilt_down",
+                path=path,
+            ),
+            servo_center=_as_key_list(
+                data.get("servo_center", d.servo_center),
+                key="servo_center",
+                path=path,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class TeleopConfig:
+    speed: int
+    steer: int
+    servo_step: int
+
+    poll_s: float
+    deadman_s: float
+
+    invert_steer: bool
+    invert_pan: bool
+    invert_tilt: bool
+
+    debug_keys: bool
+
+    keymap: TeleopKeymap
+
+    @staticmethod
+    def defaults() -> "TeleopConfig":
+        return TeleopConfig(
+            speed=1500,
+            steer=1500,
+            servo_step=20,
+            poll_s=0.02,
+            deadman_s=0.15,
+            invert_steer=False,
+            invert_pan=False,
+            invert_tilt=False,
+            debug_keys=False,
+            keymap=TeleopKeymap.defaults(),
+        )
+
+    @staticmethod
+    def from_mapping(data: Mapping[str, Any], *, path: Path) -> "TeleopConfig":
+        allowed = {
+            "speed",
+            "steer",
+            "servo_step",
+            "poll_s",
+            "deadman_s",
+            "invert_steer",
+            "invert_pan",
+            "invert_tilt",
+            "debug_keys",
+            "keymap",
+        }
+        forbid_unknown_keys(data, allowed, path=path)
+
+        d = TeleopConfig.defaults()
+
+        keymap_raw = data.get("keymap", None)
+        if keymap_raw is None:
+            keymap = d.keymap
+        else:
+            if not isinstance(keymap_raw, Mapping):
+                raise ValueError(f"Key 'keymap' in {path} must be a mapping/object")
+            keymap = TeleopKeymap.from_mapping(keymap_raw, path=path)
+
+        return TeleopConfig(
+            speed=as_int(data.get("speed", d.speed), key="speed", path=path),
+            steer=as_int(data.get("steer", d.steer), key="steer", path=path),
+            servo_step=as_int(
+                data.get("servo_step", d.servo_step), key="servo_step", path=path
+            ),
+            poll_s=as_float(data.get("poll_s", d.poll_s), key="poll_s", path=path),
+            deadman_s=as_float(
+                data.get("deadman_s", d.deadman_s), key="deadman_s", path=path
+            ),
+            invert_steer=bool(data.get("invert_steer", d.invert_steer)),
+            invert_pan=bool(data.get("invert_pan", d.invert_pan)),
+            invert_tilt=bool(data.get("invert_tilt", d.invert_tilt)),
+            debug_keys=bool(data.get("debug_keys", d.debug_keys)),
+            keymap=keymap,
+        )
+
 @dataclass(frozen=True, slots=True)
 class RunConfig:
     # motors / servo / sensors (test | freenove)
@@ -235,22 +532,34 @@ class RunConfig:
     # networking / streaming
     networking: str | None = None
 
+    # teleop
+    keyboard: str | None = None
+    teleop_cfg: str | None = None
+
     @staticmethod
     def from_mapping(data: Mapping[str, Any], *, path: Path) -> "RunConfig":
         # allow your camera_test.yaml shorthand key: "controller"
         allowed = {
             "motor_controller",
             "motor_cfg",
+
             "servo_controller",
             "servo_cfg",
+
             "infrared_controller",
             "infrared_cfg",
+
             "ultrasonic_controller",
             "ultrasonic_cfg",
+
             "camera_controller",
             "camera_cfg",
             "camera_policy",
+
             "networking",
+            
+            "keyboard",
+            "teleop_cfg",
         }
         forbid_unknown_keys(data, allowed, path=path)
 
@@ -275,6 +584,8 @@ class RunConfig:
             camera_cfg=opt_nonempty_str("camera_cfg"),
             camera_policy=opt_nonempty_str("camera_policy"),
             networking=opt_nonempty_str("networking"),
+            keyboard=opt_nonempty_str("keyboard"),   
+            teleop_cfg=opt_nonempty_str("teleop_cfg"),
         )
 
         # minimal cross-field validation (real dependencies only)
@@ -297,5 +608,22 @@ class RunConfig:
             raise ValueError(
                 f"If 'networking' is set in {path}, a camera controller must also be set"
             )
+        
+        if cfg.keyboard is not None and cfg.keyboard not in ("usb", "terminal"):
+            raise ValueError(
+                f"Key 'keyboard' in {path} must be 'usb' or 'terminal'; got {cfg.keyboard!r}"
+            )
+
+        if cfg.teleop_cfg is not None and cfg.keyboard is None:
+            cfg = RunConfig(**{**cfg.__dict__, "keyboard": "terminal"})
+
+        if cfg.teleop_cfg is not None and cfg.motor_controller is None and cfg.servo_controller is None:
+            raise ValueError(
+                f"If 'teleop_cfg' is set in {path}, at least one of motor_controller/servo_controller must be set"
+            )
+
 
         return cfg
+
+
+

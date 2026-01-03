@@ -5,10 +5,15 @@ servo_controller: freenove
 servo_cfg: default_servo
 
 infrared_controller: freenove
+infrared__cfg: default_config
+
 ultrasonic_controller: freenove
+ultrasonic_cfg: default_config
 
 camera_controller: pi
 camera_cfg: default_config
 camera_policy: default_policy
 
-networking: networking_config
+networking: default_config
+
+teleop_cfg: default_config

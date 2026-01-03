@@ -15,19 +15,25 @@ from carbot.factories.builders.servo import build_servo_driver
 from carbot.factories.builders.stream import build_streaming_service
 from carbot.factories.builders.ultrasonic import build_ultrasonic_driver
 from carbot.vision.stream_service import StreamingService
+from carbot.factories.builders.teleop import build_teleop
+from carbot.inputs.teleop import Teleop
 
 
 @dataclass(slots=True)
-class BuiltApp:
+class App:
     motor: MotorDriver | None = None
     servo: ServoDriver | None = None
     infrared: InfraredDriver | None = None
     ultrasonic: UltrasonicDriver | None = None
     camera: CameraDriver | None = None
     streaming: StreamingService | None = None
+    teleop: Teleop | None = None
 
     def close(self) -> None:
         # Close in reverse-ish dependency order
+        if self.teleop is not None:
+            self.teleop.close()
+    
         if self.streaming is not None:
             self.streaming.close()
 
@@ -47,8 +53,8 @@ class BuiltApp:
             self.motor.close()
 
 
-def build_app(run_cfg: RunConfig) -> BuiltApp:
-    app = BuiltApp()
+def build_app(run_cfg: RunConfig) -> App:
+    app = App()
 
     # Motor
     if run_cfg.motor_controller is not None:
@@ -117,5 +123,13 @@ def build_app(run_cfg: RunConfig) -> BuiltApp:
             camera_driver=app.camera,
             networking_cfg=run_cfg.networking,
         )
+    
+    # Teleop
+    if run_cfg.teleop_cfg is not None:
+        if app.motor is None and app.servo is None:
+            raise ValueError("RunConfig: teleop_cfg requires motor_controller and/or servo_controller")
+
+        keyboard = run_cfg.keyboard or "terminal"
+        app.teleop = build_teleop(keyboard=keyboard, cfg_name_or_path=run_cfg.teleop_cfg)
 
     return app

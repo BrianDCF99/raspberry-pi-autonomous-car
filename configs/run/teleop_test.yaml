@@ -3,3 +3,6 @@ motor_cfg: fast
 
 servo_controller: freenove
 servo_cfg: default_config
+
+keyboard: usb   # usb | terminal
+teleop_cfg: default_config
