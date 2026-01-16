@@ -3,13 +3,14 @@ from __future__ import annotations
 import threading
 from time import sleep
 
-from carbot.config.models import CameraPolicy
+from carbot.config.models import CameraConfig, CameraPolicy
 from carbot.contracts.camera_controller import BGRFrame, CameraController
 
 
 class CameraDriver:
-    def __init__(self, controller: CameraController, policy: CameraPolicy) -> None:
+    def __init__(self, controller: CameraController, cfg: CameraConfig, policy: CameraPolicy) -> None:
         self._ctl = controller
+        self._cfg = cfg
         self._policy = policy
 
         self._lock = threading.Lock()
@@ -18,6 +19,14 @@ class CameraDriver:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    @property
+    def cfg(self) -> CameraConfig:
+        return self._cfg
+    
+    @property
+    def policy(self) -> CameraPolicy:
+        return self._policy
+    
     def start(self) -> None:
         if self._thread is not None:
             raise RuntimeError("CameraDriver already started")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from carbot.config.models import RunConfig
+from carbot.data.models import Metadata, MetadataBuilder
 from carbot.drivers.camera_driver import CameraDriver
 from carbot.drivers.infrared_driver import InfraredDriver
 from carbot.drivers.motor_driver import MotorDriver
@@ -28,6 +29,7 @@ class App:
     camera: CameraDriver | None = None
     streaming: StreamingService | None = None
     teleop: Teleop | None = None
+    meta: Metadata | None = None
 
     def close(self) -> None:
         # Close in reverse-ish dependency order
@@ -55,7 +57,8 @@ class App:
 
 def build_app(run_cfg: RunConfig) -> App:
     app = App()
-
+    md = MetadataBuilder()
+    
     # Motor
     if run_cfg.motor_controller is not None:
         if run_cfg.motor_cfg is None:
@@ -66,6 +69,8 @@ def build_app(run_cfg: RunConfig) -> App:
             controller=run_cfg.motor_controller,
             cfg=run_cfg.motor_cfg,
         )
+
+        md.set_motor_cfg(app.motor.cfg)
 
     # Servo
     if run_cfg.servo_controller is not None:
@@ -78,6 +83,8 @@ def build_app(run_cfg: RunConfig) -> App:
             cfg=run_cfg.servo_cfg,
         )
 
+        md.set_servo_cfg(app.servo.cfg)
+
     # Infrared
     if run_cfg.infrared_controller is not None:
         if run_cfg.infrared_cfg is None:
@@ -88,6 +95,8 @@ def build_app(run_cfg: RunConfig) -> App:
             controller=run_cfg.infrared_controller,
             cfg=run_cfg.infrared_cfg,
         )
+
+        md.set_infra_cfg(app.infrared.cfg)
 
     # Ultrasonic
     if run_cfg.ultrasonic_controller is not None:
@@ -100,6 +109,9 @@ def build_app(run_cfg: RunConfig) -> App:
             cfg=run_cfg.ultrasonic_cfg,
         )
 
+        md.set_ultra_cfg(app.ultrasonic.cfg)
+
+
     # Camera (+ policy/config)
     if run_cfg.camera_controller is not None:
         if run_cfg.camera_cfg is None or run_cfg.camera_policy is None:
@@ -111,6 +123,9 @@ def build_app(run_cfg: RunConfig) -> App:
             cfg=run_cfg.camera_cfg,
             policy=run_cfg.camera_policy,
         )
+
+        md.set_cam_cfg(app.camera.cfg)
+        md.set_cam_policy(app.camera.policy)
         app.camera.start()
 
     # Streaming depends on camera driver
@@ -123,6 +138,8 @@ def build_app(run_cfg: RunConfig) -> App:
             camera_driver=app.camera,
             networking_cfg=run_cfg.networking,
         )
+
+        md.set_network_cfg(app.streaming.cfg)
     
     # Teleop
     if run_cfg.teleop_cfg is not None:
@@ -131,5 +148,9 @@ def build_app(run_cfg: RunConfig) -> App:
 
         keyboard = run_cfg.keyboard or "terminal"
         app.teleop = build_teleop(keyboard=keyboard, cfg_name_or_path=run_cfg.teleop_cfg)
+
+
+    # Metadata
+    app.meta = md.build()
 
     return app

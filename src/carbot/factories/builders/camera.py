@@ -15,4 +15,4 @@ def build_camera_driver(*, controller: str, cfg: str, policy: str) -> CameraDriv
     )
     camera_ctl = controller_factory(camera_cfg)
 
-    return CameraDriver(camera_ctl, camera_policy)
+    return CameraDriver(camera_ctl, camera_cfg, camera_policy)

@@ -65,6 +65,11 @@ class ServoDriver:
     def curr_tilt_angle(self) -> int:
         return self._state[Axis.TILT].clamped_relative
 
+    @property
+    def cfg(self) -> ServoConfig:
+        return self._cfg
+    
+
     def _set_relative(self, axis: Axis, relative: int) -> None:
         clamped_relative = self._clamp_relative(axis, relative)
         logical = clamped_relative + self._center(axis)

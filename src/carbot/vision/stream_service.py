@@ -119,6 +119,10 @@ class StreamingService:
 
         self._httpd = _ThreadedHTTPServer((cfg.host, cfg.port), handler_cls)
 
+    @property
+    def cfg(self) -> NetworkConfig:
+        return self._cfg
+    
     def serve_forever(self) -> None:
         try:
             self._httpd.serve_forever(poll_interval=0.2)

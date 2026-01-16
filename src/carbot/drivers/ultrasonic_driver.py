@@ -36,6 +36,11 @@ class UltrasonicDriver:
         )
         self._thread.start()
 
+    @property
+    def cfg(self) -> UltrasonicConfig:
+        return self._cfg
+    
+
     def stop(self) -> None:
         self._stop.set()
 

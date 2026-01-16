@@ -11,6 +11,10 @@ class MotorDriver:
         self.drive(0, 0)
         self._controller.close()
 
+    @property
+    def cfg(self) -> MotorConfig:
+        return self._cfg
+    
     ## Negative steer differential == Left Turn
     def drive(self, throttle: int, steer_differential: int) -> None:
         r_scale = self._cfg.right_scale if steer_differential != 0 else 1

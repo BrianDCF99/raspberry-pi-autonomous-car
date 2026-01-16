@@ -31,6 +31,10 @@ class InfraredDriver:
         self._thread: threading.Thread | None = None
         self._closed = False
 
+    @property
+    def cfg(self) -> InfraredConfig:
+        return self._cfg
+
     def start(self) -> None:
         if self._thread is not None:
             raise RuntimeError("InfraredDriver already started")
