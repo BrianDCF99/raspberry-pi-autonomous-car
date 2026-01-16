@@ -15,7 +15,7 @@ def build_streaming_service(
 
     pipeline = FramePipelineService(
         driver=camera_driver,
-        transform=crop_bottom_quarter,  # swap this to try different pipelines
+        transform=crop_bottom_quarter,
         idle_sleep_s=net_cfg.idle_sleep_s,
     )
     encoder = JpegEncoderService(
@@ -26,4 +26,4 @@ def build_streaming_service(
     pipeline.start()
     encoder.start()
 
-    return StreamingService(jpeg_store=encoder.store, cfg=net_cfg)
+    return StreamingService(jpeg_store=encoder.store, frame_store=pipeline.store, cfg=net_cfg)

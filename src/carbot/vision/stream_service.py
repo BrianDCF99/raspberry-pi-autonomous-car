@@ -6,6 +6,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 
+import numpy as np
+
 from carbot.config.models import NetworkConfig
 from carbot.vision.latest_store import LatestStore
 
@@ -102,9 +104,14 @@ class StreamingService:
         *,
         jpeg_store: LatestStore[bytes],
         cfg: NetworkConfig,
+        frame_store: LatestStore[np.ndarray] | None = None,
     ) -> None:
         self._cfg = cfg
         self._stop_event = threading.Event()
+
+        # expose stores for consumers (logging / dataset capture / debugging)
+        self._jpeg_store = jpeg_store
+        self._frame_store = frame_store
 
         handler_cls = type("InjectedHandler", (_Handler,), {})
         handler_cls.store = jpeg_store
@@ -124,6 +131,14 @@ class StreamingService:
         self._stop_event.set()
         self._httpd.shutdown()
         self._httpd.server_close()
+
+    def latest_jpeg(self) -> tuple[bytes | None, int]:
+        return self._jpeg_store.get()
+
+    def latest_frame(self) -> tuple[np.ndarray | None, int]:
+        if self._frame_store is None:
+            return None, 0
+        return self._frame_store.get()
 
 
 def install_signal_handlers(stop_fn) -> None:

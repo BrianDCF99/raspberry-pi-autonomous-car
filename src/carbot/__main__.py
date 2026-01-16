@@ -22,7 +22,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--hz", type=float, default=50.0)
     p.add_argument("--status-hz", type=float, default=2.0)
     p.add_argument("--no-status", action="store_true")
-    p.add_argument("--debug-keys", action="store_true")
     return p.parse_args()
 
 
@@ -81,22 +80,6 @@ def make_kb_muxs(
     return m_mux, s_mux
 
 
-def make_control_loop(
-    hz: float,
-    motor: MotorSink | None,
-    servo: ServoSink | None,
-    motor_mux: PriorityMux[MotorCommand] | None,
-    servo_mux: PriorityMux[ServoCommand] | None,
-) -> ControlLoop:
-    return ControlLoop(
-        cfg=ControlLoopConfig(hz=float(hz)),
-        motor=motor,
-        servo=servo,
-        motor_mux=motor_mux,
-        servo_mux=servo_mux,
-    )
-
-
 def run() -> int:
     args = parse_args()
     _install_sigterm_exit()
@@ -111,10 +94,6 @@ def run() -> int:
                 "app.teleop is None. Run config must set 'teleop_cfg' (and optionally 'keyboard')."
             )
 
-        # best-effort: allow CLI override if the cfg supports it
-        if hasattr(teleop, "cfg") and hasattr(teleop.cfg, "debug_keys"):
-            teleop.cfg.debug_keys = bool(args.debug_keys)
-
         print(teleop.help_text(teleop_cfg_name=cfg.teleop_cfg))
         sys.stdout.flush()
 
@@ -123,19 +102,19 @@ def run() -> int:
         max_age = max(0.05, float(teleop.cfg.deadman_s) * 2.0)
         motor_mux, servo_mux = make_kb_muxs(app=app, max_age=max_age)
 
-        loop = make_control_loop(
-            args.hz,
-            getattr(app, "motor", None),
-            getattr(app, "servo", None),
-            motor_mux,
-            servo_mux,
-        )
+        loop =  ControlLoop(
+            cfg=ControlLoopConfig(hz=float(args.hz)),
+            motor=app.motor,
+            servo=app.servo,
+            motor_mux=motor_mux,
+            servo_mux=servo_mux,
+    )           
 
         tick_dt = 1.0 / float(args.hz) if args.hz > 0 else 0.02
         status_dt = 1.0 / float(args.status_hz) if args.status_hz > 0 else 0.5
         next_status_t = monotonic() + status_dt
 
-        # Streaming (run in background so teleop/control loop can run)
+        # Streaming
         streaming = getattr(app, "streaming", None)
         if streaming is None:
             raise RuntimeError(
@@ -143,7 +122,7 @@ def run() -> int:
                 "(camera_controller + camera_cfg + camera_policy)."
             )
 
-        # Camera (if present)
+        # Camera
         camera = getattr(app, "camera", None)
         if camera is not None:
             cam_t = threading.Thread(target=camera.start, name="camera-start", daemon=True)

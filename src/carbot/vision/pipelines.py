@@ -14,7 +14,6 @@ def identity(img_bgr: np.ndarray) -> np.ndarray:
 
 def crop_bottom_quarter(img_bgr: np.ndarray) -> np.ndarray:
     h, _w = img_bgr.shape[:2]
-    # NOTE: slicing returns a view; that's fine as long as downstream treats it read-only.
     return img_bgr[h // 4 :, :]
 
 
